@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Link to external CSS for styling this page -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='add_transaction.css') }}"
+    />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Transaction</title>
+    <!-- Title of the page -->
+  </head>
+  <body>
+    <h1>Add a Transaction</h1>
+    <!-- Main heading for the page -->
+
+    <!-- Flash messages section -->
+    <!-- Displays feedback messages (success or error) after form submission -->
+    {% with messages = get_flashed_messages(with_categories=true) %} {% if
+    messages %}
+    <ul>
+      {% for category, message in messages %}
+      <li class="{{ category }}">{{ message }}</li>
+      <!-- Message category is used as a CSS class for styling -->
+      {% endfor %}
+    </ul>
+    {% endif %} {% endwith %}
+
+    <!-- Transaction form -->
+    <form method="POST">
+      <!-- CSRF token for form security -->
+      {{ form.hidden_tag() }}
+
+      <!-- Category field -->
+      <p>
+        <label for="categoryField">{{ form.category.label }}</label>
+        {{ form.category(id="categoryField", size=20) }}
+        <!-- Show validation error for category field if it exists -->
+        {% if form.category.errors %}
+        <span class="error">{{ form.category.errors[0] }}</span>
+        {% endif %}
+      </p>
+
+      <!-- Amount field -->
+      <p>
+        <label for="amountField">{{ form.amount.label }}</label>
+        {{ form.amount(id="amountField") }}
+        <!-- Show validation error for amount field if it exists -->
+        {% if form.amount.errors %}
+        <span class="error">{{ form.amount.errors[0] }}</span>
+        {% endif %}
+      </p>
+
+      <!-- Type field -->
+      <p>
+        <label for="typeField">{{ form.type.label }}</label>
+        {{ form.type(id="typeField") }}
+        <!-- Show validation error for type field if it exists -->
+        {% if form.type.errors %}
+        <span class="error">{{ form.type.errors[0] }}</span>
+        {% endif %}
+      </p>
+
+      <!-- Submit button -->
+      <p>{{ form.submit(class_="btn btn-primary") }}</p>
+    </form>
+  </body>
+</html>

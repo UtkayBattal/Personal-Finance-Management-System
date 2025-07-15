@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Finance Management Dashboard - Track your expenses and income">
+    <meta name="theme-color" content="#1a365d">
+    <title>Dashboard - Finance Management</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+</head>
+<body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+            {% for category, message in messages %}
+                    <div class="flash-message {{ category }}" data-auto-dismiss>
+                        <i class="fas {% if category == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="container">
+        <h1>Finance Management</h1>
+        <p class="welcome-text">Welcome, <span class="badge">{{ current_user.username }}</span></p>
+
+        <nav>
+            <button class="nav-button {% if active_section == 'add' %}active{% endif %}" onclick="showSection('add')">
+                <i class="fas fa-plus"></i> Add Transaction
+            </button>
+            <button class="nav-button {% if active_section == 'search' %}active{% endif %}" onclick="showSection('search')">
+                <i class="fas fa-search"></i> Search Transaction
+            </button>
+            <button class="nav-button {% if active_section == 'statistics' %}active{% endif %}" onclick="showSection('statistics')">
+                <i class="fas fa-chart-bar"></i> Statistics
+            </button>
+            <button class="nav-button {% if active_section == 'budget' %}active{% endif %}" onclick="showSection('budget')">
+                <i class="fas fa-wallet"></i> Budget
+            </button>
+            <a href="{{ url_for('main.logout') }}" class="nav-button">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
+
+        <!-- Transaction Form -->
+        <div id="add" class="section {% if active_section == 'add' %}active{% endif %}">
+            <h2>Add New Transaction</h2>
+            <form method="POST" action="{{ url_for('main.dashboard') }}" class="modern-form">
+                {% if add_form %}
+                    {{ add_form.hidden_tag() }}
+                    <div class="form-group">
+                        <label for="addAmount">Amount</label>
+                        {{ add_form.amount(id="addAmount", class="modern-input", placeholder="Enter amount") }}
+                    </div>
+                    <div class="form-group">
+                        <label for="addCategory">Category</label>
+                        {{ add_form.category(id="addCategory", class="modern-select") }}
+                    </div>
+                    <div class="form-group">
+                        <label for="addType">Type</label>
+                        {{ add_form.type(id="addType", class="modern-select", onchange="updateCategoryOptions('add')") }}
+                    </div>
+                    <div class="form-group text-right">
+                        <button type="submit" class="button primary">Add</button>
+                    </div>
+                {% endif %}
+            </form>        
+        </div>
+
+        <!-- Statistics Section -->
+        <div id="statistics" class="section {% if active_section == 'statistics' %}active{% endif %}">
+            <h2>Statistics</h2>
+            
+            {% if budget_warnings %}
+            <div class="budget-warnings">
+                {% for warning in budget_warnings %}
+                    <div class="warning-card">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>
+                            <strong>{{ warning.category }}</strong>: {{ warning.message }}
+                            <div>Budget Used: {{ "%.1f"|format(warning.percentage) }}%</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('main.dashboard', active_section='statistics') }}" class="statistics-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="graphType">Graph Type:</label>
+                        <select id="graphType" name="graph_type" class="modern-select" onchange="this.form.submit()">
+                            <option value="expense" {% if selected_graph_type == 'expense' %}selected{% endif %}>Expense</option>
+                            <option value="income" {% if selected_graph_type == 'income' %}selected{% endif %}>Income</option>
+                            <option value="budget" {% if selected_graph_type == 'budget' %}selected{% endif %}>Budget</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="periodType">Period:</label>
+                        <select id="periodType" name="period_type" class="modern-select" onchange="updatePeriodSelectors()">
+                            <option value="monthly" {% if period_type == 'monthly' %}selected{% endif %}>Monthly</option>
+                            <option value="yearly" {% if period_type == 'yearly' %}selected{% endif %}>Yearly</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="yearSelector">
+                        <label for="selectedYear">Year:</label>
+                        <select id="selectedYear" name="selected_year" class="modern-select">
+                            {% for year in range(2020, 2031) %}
+                                <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" id="monthSelector" {% if period_type == 'yearly' %}style="display: none;"{% endif %}>
+                        <label for="selectedMonth">Month:</label>
+                        <select id="selectedMonth" name="selected_month" class="modern-select">
+                            {% for i in range(12) %}
+                                <option value="{{ i+1 }}" {% if selected_month == i+1 %}selected{% endif %}>{{ months[i] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group text-right">
+                    <button type="submit" class="button primary">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+            </form>
+
+            <div class="statistics-container">
+                {% if selected_graph_type in ['expense', 'income'] %}
+                    <div class="chart-grid">
+                        <div class="chart-wrapper">
+                <div class="chart">
+                    <canvas id="pieChart"></canvas>
+                </div>
+                        </div>
+                        <div class="chart-wrapper">
+                <div class="chart">
+                    <canvas id="barChart"></canvas>
+                </div>
+                        </div>
+                        <div class="chart-wrapper">
+                <div class="chart">
+                    <canvas id="lineChart"></canvas>
+                </div>
+                        </div>
+                        <div class="chart-wrapper">
+                <div class="chart">
+                    <canvas id="monthlyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="chart-grid">
+                        <div class="chart-wrapper">
+                            <div class="chart">
+                                <canvas id="budgetExpenseChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div class="chart">
+                                <canvas id="budgetLineChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div class="chart">
+                                <canvas id="forecastChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Transaction Search -->
+        <div id="search" class="section {% if active_section == 'search' %}active{% endif %}">
+            <h2>İşlem Ara</h2>
+            <form method="POST" action="{{ url_for('main.dashboard', active_section='search') }}" class="modern-form">
+                {% if search_form %}
+                    {{ search_form.hidden_tag() }}
+                    <div class="form-group">
+                        <label for="minAmount">{{ search_form.min_amount.label }}</label>
+                        {{ search_form.min_amount(id="minAmount", class="modern-input", placeholder="Minimum amount") }}
+                    </div>
+                    <div class="form-group">
+                        <label for="maxAmount">{{ search_form.max_amount.label }}</label>
+                        {{ search_form.max_amount(id="maxAmount", class="modern-input", placeholder="Maximum amount") }}
+                    </div>
+                    <div class="form-group">
+                        <label for="searchCategory">{{ search_form.category.label }}</label>
+                        {{ search_form.category(id="searchCategory", class="modern-select") }}
+                    </div>
+                    <div class="form-group">
+                        <label for="searchType">{{ search_form.type.label }}</label>
+                        {{ search_form.type(id="searchType", class="modern-select", onchange="updateCategoryOptions('search')") }}
+                    </div>
+                    <div class="form-group text-right">
+                        {{ search_form.submit(class="button primary") }}
+                    </div>
+                {% endif %}
+            </form>
+
+            {% if transactions %}
+                <h3>Sonuçlar:</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Kategori</th>
+                            <th>Miktar</th>
+                            <th>Tür</th>
+                            <th>Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                            <tr>
+                                <td>{{ transaction.category }}</td>
+                                <td>{{ transaction.amount }}</td>
+                                <td>{{ transaction.type }}</td>
+                                <td>{{ transaction.date.strftime('%d.%m.%Y') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-center">No results found. Please specify the search criteria and click the "Search" button..</p>
+            {% endif %}
+        </div>
+
+        <!-- Budget Form -->
+        <div id="budget" class="section {% if active_section == 'budget' %}active{% endif %}">
+            <h2>Bütçe Ekle</h2>
+            <form method="POST" action="{{ url_for('main.dashboard', active_section='budget') }}" class="modern-form">
+                {% if budget_form %}
+                    {{ budget_form.hidden_tag() }}
+                    
+                    <div class="form-group">
+                        <label for="budgetAmount">{{ budget_form.amount.label }}</label>
+                        {{ budget_form.amount(id="budgetAmount", class="modern-input", placeholder="Enter budget amount") }}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="budgetCategory">{{ budget_form.category.label }}</label>
+                        {{ budget_form.category(id="budgetCategory", class="modern-select") }}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="budgetPeriod">{{ budget_form.period.label }}</label>
+                        {{ budget_form.period(id="budgetPeriod", class="modern-select") }}
+                    </div>
+                    
+                    <div class="form-group text-right">
+                        {{ budget_form.submit(class="button primary") }}
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashMessages = document.querySelectorAll('.flash-message[data-auto-dismiss]');
+            flashMessages.forEach(function(message) {
+                setTimeout(function() {
+                    message.style.opacity = '0';
+                    message.style.transform = 'translateY(-20px)';
+                    setTimeout(function() {
+                        message.remove();
+                    }, 300);
+                }, 3000);
+            });
+
+            updatePeriodSelectors();
+            initializeCharts();
+        });
+
+        function initializeCharts() {
+            const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 11,
+                                family: "'Poppins', sans-serif"
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        font: {
+                            size: 14,
+                            family: "'Poppins', sans-serif",
+                            weight: '600'
+                        },
+                        padding: {
+                            top: 10,
+                            bottom: 15
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(26, 54, 93, 0.9)',
+                        titleFont: {
+                            size: 12,
+                            family: "'Poppins', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 11,
+                            family: "'Poppins', sans-serif"
+                        },
+                        padding: 10,
+                        cornerRadius: 6,
+                        displayColors: true
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 10,
+                                family: "'Poppins', sans-serif"
+                            }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(26, 54, 93, 0.05)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 10,
+                                family: "'Poppins', sans-serif"
+                            },
+                            callback: function(value) {
+                                if (value >= 1000) {
+                                    return (value/1000).toLocaleString('tr-TR', {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 1
+                                    }) + ' B';
+                                }
+                                return value.toLocaleString('tr-TR');
+                            }
+                        },
+                        beginAtZero: true
+                    }
+                },
+                animation: {
+                    duration: 800,
+                    easing: 'easeOutQuart'
+                },
+                elements: {
+                    line: {
+                        tension: 0.4
+                    },
+                    point: {
+                        radius: 3,
+                        hitRadius: 6,
+                        hoverRadius: 5
+                    }
+                }
+            };
+
+            // Pie Chart (Category Distribution)
+            const pieCtx = document.getElementById('pieChart')?.getContext('2d');
+            if (pieCtx && '{{ selected_graph_type }}' !== 'budget') {
+                new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: {{ category_labels | tojson | safe }},
+                        datasets: [{
+                            data: {{ category_data | tojson | safe }},
+                            backgroundColor: [
+                                'rgba(26, 54, 93, 0.8)',
+                                'rgba(66, 153, 225, 0.8)',
+                                'rgba(72, 187, 120, 0.8)',
+                                'rgba(246, 173, 85, 0.8)',
+                                'rgba(245, 101, 101, 0.8)',
+                                'rgba(159, 122, 234, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgb(26, 54, 93)',
+                                'rgb(66, 153, 225)',
+                                'rgb(72, 187, 120)',
+                                'rgb(246, 173, 85)',
+                                'rgb(245, 101, 101)',
+                                'rgb(159, 122, 234)'
+                            ],
+                            borderWidth: 1.5,
+                            hoverOffset: 12
+                        }]
+                    },
+                    options: {
+                        ...options,
+                        plugins: {
+                            ...options.plugins,
+                            title: {
+                                ...options.plugins.title,
+                                text: 'Category Distribution'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Bar Chart (Amount by Category)
+            const barCtx = document.getElementById('barChart')?.getContext('2d');
+            if (barCtx && '{{ selected_graph_type }}' !== 'budget') {
+                const selectedType = '{{ selected_graph_type }}';
+                const allCategories = selectedType === 'income' 
+                    ? ['Salary/Wages', 'Freelancing/Consulting', 'Investment Income', 'Rental Income', 'Business Income', 'Other']
+                    : ['Clothing', 'Food', 'Market', 'Entertainment', 'Other'];
+                
+                const categories = {{ category_labels | tojson | safe }};
+                const amounts = {{ category_data | tojson | safe }};
+                
+                // Tüm kategoriler için veri hazırla
+                const categoryData = allCategories.map(category => {
+                    const index = categories.indexOf(category);
+                    return index !== -1 ? amounts[index] : 0;
+                });
+
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: allCategories,
+                        datasets: [{
+                            label: '{{ selected_graph_type|capitalize }}',
+                            data: categoryData,
+                            backgroundColor: 'rgba(66, 153, 225, 0.8)',
+                            borderColor: 'rgb(66, 153, 225)',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        ...options,
+                        plugins: {
+                            ...options.plugins,
+                            title: {
+                                ...options.plugins.title,
+                                text: 'Amount by Category'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Line Chart (Trend by Category)
+            const lineCtx = document.getElementById('lineChart')?.getContext('2d');
+            if (lineCtx && '{{ selected_graph_type }}' !== 'budget') {
+                const selectedType = '{{ selected_graph_type }}';
+                const allCategories = selectedType === 'income' 
+                    ? ['Salary/Wages', 'Freelancing/Consulting', 'Investment Income', 'Rental Income', 'Business Income', 'Other']
+                    : ['Clothing', 'Food', 'Market', 'Entertainment', 'Other'];
+                
+                const categories = {{ category_labels | tojson | safe }};
+                const amounts = {{ category_data | tojson | safe }};
+                
+                // Tüm kategoriler için veri hazırla
+                const categoryData = allCategories.map(category => {
+                    const index = categories.indexOf(category);
+                    return index !== -1 ? amounts[index] : 0;
+                });
+
+                new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: allCategories,
+                        datasets: [{
+                            label: '{{ selected_graph_type|capitalize }}',
+                            data: categoryData,
+                            borderColor: 'rgb(66, 153, 225)',
+                            backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        ...options,
+                        plugins: {
+                            ...options.plugins,
+                            title: {
+                                ...options.plugins.title,
+                                text: 'Trend by Category'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Distribution Chart (Daily/Monthly based on period type)
+            const distributionCtx = document.getElementById('monthlyChart')?.getContext('2d');
+            if (distributionCtx && '{{ selected_graph_type }}' !== 'budget') {
+                const isPeriodMonthly = '{{ period_type }}' === 'monthly';
+                const labels = isPeriodMonthly 
+                    ? Array.from({length: 31}, (_, i) => (i + 1).toString())
+                    : {{ months | tojson | safe }};
+                
+                const data = isPeriodMonthly ? {{ daily_data | tojson | safe }} : {{ monthly_data | tojson | safe }};
+                const datasets = Object.entries(data).map(([category, values], index) => ({
+                    label: category,
+                    data: values,
+                    borderColor: [
+                        'rgb(26, 54, 93)',
+                        'rgb(66, 153, 225)',
+                        'rgb(72, 187, 120)',
+                        'rgb(246, 173, 85)',
+                        'rgb(245, 101, 101)',
+                        'rgb(159, 122, 234)'
+                    ][index % 6],
+                    backgroundColor: [
+                        'rgba(26, 54, 93, 0.1)',
+                        'rgba(66, 153, 225, 0.1)',
+                        'rgba(72, 187, 120, 0.1)',
+                        'rgba(246, 173, 85, 0.1)',
+                        'rgba(245, 101, 101, 0.1)',
+                        'rgba(159, 122, 234, 0.1)'
+                    ][index % 6],
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }));
+
+                new Chart(distributionCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        ...options,
+                        plugins: {
+                            ...options.plugins,
+                            title: {
+                                ...options.plugins.title,
+                                text: isPeriodMonthly ? 'Daily Distribution' : 'Monthly Distribution'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Budget Charts
+            const budgetExpenseCtx = document.getElementById('budgetExpenseChart')?.getContext('2d');
+            if (budgetExpenseCtx && '{{ selected_graph_type }}' === 'budget' && typeof {{ category_data | tojson | safe }} === 'object') {
+                const budgetData = {{ category_data | tojson | safe }};
+                // Tüm kategorileri içeren sabit liste
+                const allCategories = ['Clothing', 'Food', 'Market', 'Entertainment', 'Other'];
+                
+                // Her kategori için veri hazırla (olmayan kategoriler için 0)
+                const budgetValues = allCategories.map(category => {
+                    const index = {{ category_labels | tojson | safe }}.indexOf(category);
+                    return index !== -1 ? budgetData.budget[index] : 0;
+                });
+                
+                const expenseValues = allCategories.map(category => {
+                    const index = {{ category_labels | tojson | safe }}.indexOf(category);
+                    return index !== -1 ? budgetData.expense[index] : 0;
+                });
+
+                new Chart(budgetExpenseCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: allCategories,
+                        datasets: [{
+                            label: 'Budget',
+                            data: budgetValues,
+                            backgroundColor: 'rgba(72, 187, 120, 0.8)',
+                            borderColor: 'rgb(72, 187, 120)',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Actual Expenses',
+                            data: expenseValues,
+                            backgroundColor: 'rgba(245, 101, 101, 0.8)',
+                            borderColor: 'rgb(245, 101, 101)',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        ...options,
+                        plugins: {
+                            ...options.plugins,
+                            title: {
+                                ...options.plugins.title,
+                                text: 'Budget vs Actual Expenses'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    autoSkip: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(26, 54, 93, 0.05)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const budgetLineCtx = document.getElementById('budgetLineChart')?.getContext('2d');
+            if (budgetLineCtx && '{{ selected_graph_type }}' === 'budget' && typeof {{ category_data | tojson | safe }} === 'object') {
+                const budgetData = {{ category_data | tojson | safe }};
+                // Tüm kategorileri içeren sabit liste
+                const allCategories = ['Clothing', 'Food', 'Market', 'Entertainment', 'Other'];
+                
+                // Her kategori için veri hazırla (olmayan kategoriler için 0)
+                const budgetValues = allCategories.map(category => {
+                    const index = {{ category_labels | tojson | safe }}.indexOf(category);
+                    return index !== -1 ? budgetData.budget[index] : 0;
+                });
+                
+                const expenseValues = allCategories.map(category => {
+                    const index = {{ category_labels | tojson | safe }}.indexOf(category);
+                    return index !== -1 ? budgetData.expense[index] : 0;
+                });
+
+                new Chart(budgetLineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: allCategories,
+                        datasets: [{
+                            label: 'Budget',
+                            data: budgetValues,
+                            borderColor: 'rgb(72, 187, 120)',
+                            backgroundColor: 'rgba(72, 187, 120, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Actual Expenses',
+                            data: expenseValues,
+                            borderColor: 'rgb(245, 101, 101)',
+                            backgroundColor: 'rgba(245, 101, 101, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        ...options,
+                        plugins: {
+                            ...options.plugins,
+                            title: {
+                                ...options.plugins.title,
+                                text: 'Budget vs Expenses Trend'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    autoSkip: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(26, 54, 93, 0.05)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Forecast Chart
+            const forecastCtx = document.getElementById('forecastChart')?.getContext('2d');
+            if (forecastCtx && '{{ selected_graph_type }}' === 'budget') {
+                console.log('Forecast chart initialization started');
+                const budgetData = {{ category_data | tojson | safe }};
+                console.log('Budget data:', budgetData);
+                
+                const datasets = [];
+                
+                // Add total forecast line
+                datasets.push({
+                    label: 'Predicted Total Expenses',
+                    data: budgetData.forecast.Total.forecast,
+                    borderColor: '#4299E1',
+                    backgroundColor: '#4299E120',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: false,
+                    borderDash: [5, 5]
+                });
+                
+                // Add total actual line
+                datasets.push({
+                    label: 'Actual Total Expenses',
+                    data: budgetData.forecast.Total.actual,
+                    borderColor: '#48BB78',
+                    backgroundColor: '#48BB7820',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: false
+                });
+
+                const monthLabels = budgetData.forecast.Total.months;
+                
+                console.log('Datasets:', datasets);
+                console.log('Month labels:', monthLabels);
+
+                new Chart(forecastCtx, {
+                    type: 'line',
+                    data: {
+                        labels: monthLabels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Total Expense Forecast vs Actual for Next 6 Months',
+                                font: {
+                                    size: 14,
+                                    family: "'Poppins', sans-serif",
+                                    weight: '600'
+                                },
+                                padding: {
+                                    top: 10,
+                                    bottom: 15
+                                }
+                            },
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    padding: 15,
+                                    font: {
+                                        size: 11,
+                                        family: "'Poppins', sans-serif"
+                                    },
+                                    usePointStyle: true,
+                                    pointStyle: 'circle'
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(26, 54, 93, 0.9)',
+                                titleFont: {
+                                    size: 12,
+                                    family: "'Poppins', sans-serif"
+                                },
+                                bodyFont: {
+                                    size: 11,
+                                    family: "'Poppins', sans-serif"
+                                },
+                                padding: 10,
+                                cornerRadius: 6,
+                                displayColors: true
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    font: {
+                                        size: 10,
+                                        family: "'Poppins', sans-serif"
+                                    }
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(26, 54, 93, 0.05)'
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 10,
+                                        family: "'Poppins', sans-serif"
+                                    },
+                                    callback: function(value) {
+                                        if (value >= 1000) {
+                                            return (value/1000).toLocaleString('en-US', {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 1
+                                            }) + 'K';
+                                        }
+                                        return value.toLocaleString('en-US');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('Forecast chart created successfully');
+            } else {
+                console.log('Forecast chart not initialized:', {
+                    hasContext: !!forecastCtx,
+                    graphType: '{{ selected_graph_type }}'
+                });
+            }
+        }
+
+        function showSection(sectionId) {
+            window.location.href = "{{ url_for('main.dashboard') }}?active_section=" + sectionId;
+        }
+
+        function updatePeriodSelectors() {
+            const periodType = document.getElementById('periodType').value;
+            const monthSelector = document.getElementById('monthSelector');
+            
+            if (periodType === 'yearly') {
+                monthSelector.style.display = 'none';
+            } else {
+                monthSelector.style.display = 'block';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePeriodSelectors();
+            
+            // Graph Type değiştiğinde form submit
+            document.getElementById('graphType').addEventListener('change', function() {
+                this.form.submit();
+            });
+        });
+
+        function updateCategoryOptions(formType) {
+            const typeSelect = document.getElementById(formType + 'Type');
+            const categorySelect = document.getElementById(formType + 'Category');
+            
+            // Kategori seçeneklerini temizle
+            categorySelect.innerHTML = '';
+            
+            // Seçilen tipe göre kategorileri belirle
+            let categories = [];
+            if (typeSelect.value === 'income') {
+                categories = [
+                    ['Salary/Wages', 'Salary/Wages'],
+                    ['Freelancing/Consulting', 'Freelancing/Consulting'],
+                    ['Investment Income', 'Investment Income'],
+                    ['Rental Income', 'Rental Income'],
+                    ['Business Income', 'Business Income'],
+                    ['Other', 'Other']
+                ];
+            } else {
+                categories = [
+                    ['Clothing', 'Clothing'],
+                    ['Food', 'Food'],
+                    ['Market', 'Market'],
+                    ['Entertainment', 'Entertainment'],
+                    ['Other', 'Other']
+                ];
+            }
+            
+            // Kategorileri ekle
+            categories.forEach(([value, text]) => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = text;
+                categorySelect.appendChild(option);
+            });
+        }
+
+        // Sayfa yüklendiğinde kategorileri güncelle
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCategoryOptions('add');
+            updateCategoryOptions('search');
+            
+            // Type değiştiğinde kategorileri güncelle
+            document.getElementById('addType').addEventListener('change', () => updateCategoryOptions('add'));
+            document.getElementById('searchType').addEventListener('change', () => updateCategoryOptions('search'));
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Management Platform</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='index.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <div class="hero-section">
+        <h1 class="hero-title">Shape Your Financial Future</h1>
+        <p class="hero-subtitle">
+          Secure your future with professional financial management tools
+        </p>
+
+        <div class="cta-buttons">
+          <a
+            href="{{ url_for('main.auth', action='register') }}"
+            class="cta-button primary-button"
+          >
+            <i class="fas fa-rocket"></i> Get Started
+          </a>
+          <a
+            href="{{ url_for('main.auth', action='login') }}"
+            class="cta-button secondary-button"
+          >
+            <i class="fas fa-sign-in-alt"></i> Login
+          </a>
+        </div>
+      </div>
+
+      <div class="features">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <i class="fas fa-chart-pie"></i>
+          </div>
+          <h3 class="feature-title">Portfolio Management</h3>
+          <p class="feature-description">
+            Manage your investments wisely and make secure decisions with risk
+            analysis.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <h3 class="feature-title">Secure Transactions</h3>
+          <p class="feature-description">
+            Operate securely on our infrastructure protected by the latest
+            security technologies.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <i class="fas fa-rocket"></i>
+          </div>
+          <h3 class="feature-title">Smart Investment</h3>
+          <p class="feature-description">
+            Optimize your investments with AI-powered recommendations.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="social-links">
+      <a
+        href="https://github.com/UtkayBattal"
+        target="_blank"
+        class="social-icon"
+      >
+        <i class="fab fa-github"></i>
+      </a>
+      <a
+        href="https://www.linkedin.com/in/utkay-güngör-battal-951497263/"
+        target="_blank"
+        class="social-icon"
+      >
+        <i class="fab fa-linkedin-in"></i>
+      </a>
+    </div>
+
+    <footer>
+      <p>© 2024 Finance Management | Secure and Easy Financial Management</p>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Budget</title>
+    <!-- Page title and meta information -->
+  </head>
+  <body>
+    <h1>Add Budget</h1>
+    <!-- Main heading of the page -->
+
+    <form method="POST">
+      <!-- Form for submitting a new budget -->
+
+      {{ form.hidden_tag() }}
+      <!-- CSRF token for security (provided by Flask-WTF) -->
+
+      <p>
+        {{ form.category.label }} {{ form.category() }}
+        <!-- Input field for entering the budget category -->
+      </p>
+
+      <p>
+        {{ form.amount.label }} {{ form.amount() }}
+        <!-- Input field for specifying the budget amount -->
+      </p>
+
+      <p>
+        {{ form.period.label }} {{ form.period() }}
+        <!-- Dropdown menu for selecting the budget period (e.g., Monthly, Yearly) -->
+      </p>
+
+      <p>{{ form.submit() }}</p>
+      <!-- Submit button to send the form data -->
+    </form>
+  </body>
+</html>
